@@ -1,15 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { InputTab } from '../types';
-import { TextIcon, UploadIcon, CameraIcon, CloseIcon, MicrophoneIcon } from './Icons';
+import { TextIcon, UploadIcon, CameraIcon, CloseIcon } from './Icons';
 import CameraModal from './CameraModal';
-
-// For browsers that still use prefixes
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
 
 interface InputAreaProps {
   inputText: string;
@@ -44,33 +36,13 @@ const InputArea: React.FC<InputAreaProps> = ({ inputText, setInputText, setInput
   const [activeTab, setActiveTab] = useState<InputTab>(InputTab.Text);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [isListening, setIsListening] = useState(false);
-  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  useEffect(() => {
-    // Check for browser support on mount
-    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (SpeechRecognitionAPI) {
-      setIsSpeechRecognitionSupported(true);
-    }
-
-    // Cleanup function to stop listening when component unmounts
-    return () => {
-      recognitionRef.current?.stop();
-    };
-  }, []);
 
   useEffect(() => {
     // Clear image when switching to text tab
     if (activeTab === InputTab.Text) {
       handleRemoveImage();
-    } else {
-      // Stop listening if user switches tab
-      recognitionRef.current?.stop();
-      setIsListening(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
@@ -105,44 +77,6 @@ const InputArea: React.FC<InputAreaProps> = ({ inputText, setInputText, setInput
       setActiveTab(InputTab.Text);
   }
 
-  const handleToggleListening = () => {
-    if (!isSpeechRecognitionSupported) return;
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-    } else {
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const recognition = new SpeechRecognitionAPI();
-      recognitionRef.current = recognition;
-
-      recognition.lang = 'bn-BD'; // Bengali (Bangladesh)
-      recognition.continuous = true;
-      recognition.interimResults = true;
-
-      const originalText = inputText.trim() ? inputText.trim() + ' ' : '';
-
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = (event) => console.error('Speech recognition error:', event.error);
-
-      recognition.onresult = (event) => {
-        let finalTranscript = '';
-        let interimTranscript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          const transcriptPart = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcriptPart;
-          } else {
-            interimTranscript += transcriptPart;
-          }
-        }
-        setInputText(originalText + finalTranscript + interimTranscript);
-      };
-      
-      recognition.start();
-    }
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex justify-start border-b -mx-4 sm:-mx-6 px-2">
@@ -157,25 +91,10 @@ const InputArea: React.FC<InputAreaProps> = ({ inputText, setInputText, setInput
             <textarea
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
-              placeholder={isListening ? "শুনছি..." : "আপনার গণিতের প্রশ্নটি এখানে লিখুন, যেমন: x^2 - 5x + 6 = 0"}
-              className="w-full p-3 pr-12 border border-slate-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition h-32"
+              placeholder="আপনার গণিতের প্রশ্নটি এখানে লিখুন, যেমন: x^2 - 5x + 6 = 0"
+              className="w-full p-3 border border-slate-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition h-32"
               disabled={isLoading}
             />
-            {isSpeechRecognitionSupported && (
-              <button
-                type="button"
-                onClick={handleToggleListening}
-                className={`absolute bottom-3 right-3 p-2 rounded-full transition-colors ${
-                    isListening
-                        ? 'bg-red-500 text-white animate-pulse'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                }`}
-                aria-label={isListening ? "শোনা বন্ধ করুন" : "ভয়েস ইনপুট শুরু করুন"}
-                title={isListening ? "শোনা বন্ধ করুন" : "ভয়েস ইনপুট শুরু করুন"}
-              >
-                  <MicrophoneIcon className="w-5 h-5" />
-              </button>
-            )}
           </div>
         )}
         {(activeTab === InputTab.File || activeTab === InputTab.Camera) && (
@@ -223,7 +142,7 @@ const InputArea: React.FC<InputAreaProps> = ({ inputText, setInputText, setInput
               <ExampleButton onClick={() => handleExampleClick('x^2 - 5x + 6 = 0')}>দ্বিঘাত সমীকরণ</ExampleButton>
               <ExampleButton onClick={() => handleExampleClick('2x + 5 = 15')}>সরল সমীকরণ</ExampleButton>
               <ExampleButton onClick={() => handleExampleClick('sin(90) + cos(0) = ?')}>ত্রিকোণমিতি</ExampleButton>
-              <ExampleButton onClick={() => handleExampleClick('d/dx (x^3 + 2x)')}>ব্যবকলন</ExampleButton>
+              <ExampleButton onClick={() => handleExampleClick('y = 2x + 1 এর গ্রাফ আঁক')}>ব্যবকলন</ExampleButton>
           </div>
       </div>
       <CameraModal isOpen={isCameraOpen} onClose={() => setIsCameraOpen(false)} onCapture={handleCameraCapture} />
