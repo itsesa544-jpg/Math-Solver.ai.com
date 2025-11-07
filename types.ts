@@ -9,3 +9,11 @@ export enum OutputFormat {
   Brief = 'brief',
   Direct = 'direct',
 }
+
+export interface HistoryItem {
+  id: number;
+  inputTab: InputTab;
+  problemInput: string;
+  imagePreview: string | null;
+  solution: string;
+}

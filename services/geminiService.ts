@@ -2,11 +2,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { InputTab, OutputFormat } from '../types';
 
-if (!process.env.API_KEY) {
-    console.warn("API_KEY environment variable not set. Using a placeholder. Please provide a valid API key for the app to function.");
-}
-
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || "YOUR_API_KEY_HERE" });
+// Per coding guidelines, the API key must be read from the `process.env.API_KEY` environment variable.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 interface SolveParams {
   text: string;
@@ -48,25 +45,28 @@ export const solveMathProblem = async ({ text, image, inputMethod, outputFormat 
 ${getOutputFormatInstruction(outputFormat)}
 Use Markdown for formatting equations and steps where appropriate.`;
 
-  const promptParts: (string | { inlineData: { mimeType: string; data: string } })[] = [];
+  // FIX: Refactored content generation to align with Gemini API best practices.
+  let contents;
 
   if (inputMethod === InputTab.Text) {
-    promptParts.push(text);
+    contents = text;
   } else if (image) {
-    promptParts.push("Solve the math problem shown in the image.");
     const base64Image = await fileToBase64(image);
-    promptParts.push({
-      inlineData: {
-        mimeType: image.type,
-        data: base64Image,
-      },
-    });
+    contents = {
+      parts: [
+        { text: "Solve the math problem shown in the image." },
+        {
+          inlineData: {
+            mimeType: image.type,
+            data: base64Image,
+          },
+        },
+      ],
+    };
   } else {
     throw new Error("No input provided for the problem.");
   }
   
-  const contents = { parts: promptParts.map(p => typeof p === 'string' ? {text: p} : p) };
-
   try {
     const response = await ai.models.generateContent({
         model,
