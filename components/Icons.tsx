@@ -18,6 +18,12 @@ export const DownloadIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => 
   </svg>
 );
 
+export const ShareIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 1 0 0 2.186m0-2.186L12 14.25l4.783-2.157m-4.783 0L12 11.75l-4.783-2.157m0 0a2.25 2.25 0 1 0 4.783-2.157m-4.783 2.157L12 14.25l4.783-2.157m0 0a2.25 2.25 0 1 0 0-2.186m0 2.186L12 11.75l-4.783-2.157" />
+    </svg>
+);
+
 export const ArrowLeftIcon: React.FC<React.SVGProps<SVGSVGElement>> = (props) => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" {...props}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 15.75 3 12m0 0 3.75-3.75M3 12h18" />
