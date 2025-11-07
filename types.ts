@@ -1,13 +1,13 @@
 
 export enum InputTab {
   Text = 'text',
-  Image = 'image',
+  File = 'file',
+  Camera = 'camera',
 }
 
 export enum OutputFormat {
   Detailed = 'detailed',
   Brief = 'brief',
-  Direct = 'direct',
 }
 
 export interface GraphSolution {
@@ -16,12 +16,11 @@ export interface GraphSolution {
   graphImage: string; // base64 data URL
 }
 
-export type Solution = string | GraphSolution;
+export type Solution = string | GraphSolution | null;
 
-// Fix: Add missing HistoryItem type
 export interface HistoryItem {
   id: string;
   problemInput: string;
-  imagePreview: string | null;
+  imagePreview?: string;
   solution: Solution;
 }

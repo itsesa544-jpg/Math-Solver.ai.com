@@ -1,144 +1,232 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { InputTab } from '../types';
-import { SendIcon, UploadIcon, CloseIcon } from './Icons';
+import { TextIcon, UploadIcon, CameraIcon, CloseIcon, MicrophoneIcon } from './Icons';
+import CameraModal from './CameraModal';
+
+// For browsers that still use prefixes
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
 
 interface InputAreaProps {
-  activeInputTab: InputTab;
-  setActiveInputTab: (tab: InputTab) => void;
-  problemInput: string;
-  setProblemInput: (input: string) => void;
-  imageFile: File | null;
-  setImageFile: (file: File | null) => void;
-  handleSolve: () => void;
+  inputText: string;
+  setInputText: (text: string) => void;
+  setInputImage: (file: File | null) => void;
+  onSolve: () => void;
   isLoading: boolean;
 }
 
-const InputArea: React.FC<InputAreaProps> = ({
-  activeInputTab,
-  setActiveInputTab,
-  problemInput,
-  setProblemInput,
-  imageFile,
-  setImageFile,
-  handleSolve,
-  isLoading,
-}) => {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+const TabButton: React.FC<{ icon: React.ReactNode; label: string; name: InputTab; isActive: boolean; onClick: () => void }> = ({ icon, label, name, isActive, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+      isActive
+        ? 'border-blue-600 text-blue-600'
+        : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
+    }`}
+  >
+    {icon}
+    {label}
+  </button>
+);
+
+const ExampleButton: React.FC<{ children: React.ReactNode; onClick: () => void }> = ({ children, onClick }) => (
+    <button onClick={onClick} className="px-3 py-1.5 text-sm bg-slate-100 text-slate-600 rounded-md hover:bg-slate-200 hover:text-slate-800 transition-colors">
+        {children}
+    </button>
+);
+
+
+const InputArea: React.FC<InputAreaProps> = ({ inputText, setInputText, setInputImage, onSolve, isLoading }) => {
+  const [activeTab, setActiveTab] = useState<InputTab>(InputTab.Text);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const [isListening, setIsListening] = useState(false);
+  const [isSpeechRecognitionSupported, setIsSpeechRecognitionSupported] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   useEffect(() => {
-    if (!imageFile) {
-      setPreviewUrl(null);
-      return;
+    // Check for browser support on mount
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRecognitionAPI) {
+      setIsSpeechRecognitionSupported(true);
     }
 
-    const objectUrl = URL.createObjectURL(imageFile);
-    setPreviewUrl(objectUrl);
+    // Cleanup function to stop listening when component unmounts
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
 
-    // Clean up the object URL on component unmount or when the file changes
-    return () => URL.revokeObjectURL(objectUrl);
-  }, [imageFile]);
+  useEffect(() => {
+    // Clear image when switching to text tab
+    if (activeTab === InputTab.Text) {
+      handleRemoveImage();
+    } else {
+      // Stop listening if user switches tab
+      recognitionRef.current?.stop();
+      setIsListening(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setInputImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+  
+  const handleCameraCapture = (file: File) => {
+      setInputImage(file);
+      setImagePreview(URL.createObjectURL(file));
+      setIsCameraOpen(false);
+  }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setImageFile(e.target.files[0]);
+  const handleRemoveImage = () => {
+    setInputImage(null);
+    if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+        setImagePreview(null);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+  
+  const handleExampleClick = (text: string) => {
+      setInputText(text);
+      setActiveTab(InputTab.Text);
+  }
+
+  const handleToggleListening = () => {
+    if (!isSpeechRecognitionSupported) return;
+
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognitionAPI();
+      recognitionRef.current = recognition;
+
+      recognition.lang = 'bn-BD'; // Bengali (Bangladesh)
+      recognition.continuous = true;
+      recognition.interimResults = true;
+
+      const originalText = inputText.trim() ? inputText.trim() + ' ' : '';
+
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = (event) => console.error('Speech recognition error:', event.error);
+
+      recognition.onresult = (event) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const transcriptPart = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcriptPart;
+          } else {
+            interimTranscript += transcriptPart;
+          }
+        }
+        setInputText(originalText + finalTranscript + interimTranscript);
+      };
+      
+      recognition.start();
     }
   };
 
   return (
     <div className="space-y-4">
-      <div className="border-b border-slate-200">
-        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          <button
-            onClick={() => setActiveInputTab(InputTab.Text)}
-            className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
-              activeInputTab === InputTab.Text
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            লেখা
-          </button>
-          <button
-            onClick={() => setActiveInputTab(InputTab.Image)}
-            className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
-              activeInputTab === InputTab.Image
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            ছবি
-          </button>
-        </nav>
+      <div className="flex justify-start border-b -mx-4 sm:-mx-6 px-2">
+        <TabButton icon={<TextIcon className="w-5 h-5" />} label="লেখা" name={InputTab.Text} isActive={activeTab === InputTab.Text} onClick={() => setActiveTab(InputTab.Text)} />
+        <TabButton icon={<UploadIcon className="w-5 h-5" />} label="ফাইল" name={InputTab.File} isActive={activeTab === InputTab.File} onClick={() => setActiveTab(InputTab.File)} />
+        <TabButton icon={<CameraIcon className="w-5 h-5" />} label="ক্যামেরা" name={InputTab.Camera} isActive={activeTab === InputTab.Camera} onClick={() => setActiveTab(InputTab.Camera)} />
       </div>
 
-      {activeInputTab === InputTab.Text ? (
-        <textarea
-          value={problemInput}
-          onChange={(e) => setProblemInput(e.target.value)}
-          placeholder="উদাহরণ: 2x + 5 = 15 সমীকরণে x এর মান নির্ণয় করুন"
-          className="w-full h-28 p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-          disabled={isLoading}
-        />
-      ) : (
-        <>
-        {previewUrl && imageFile ? (
-            <div className="relative w-full p-2 border border-slate-300 rounded-lg bg-slate-50">
-                <img src={previewUrl} alt="Image preview" className="w-full max-h-48 h-auto object-contain rounded-md" />
-                <button
-                    onClick={() => setImageFile(null)}
-                    disabled={isLoading}
-                    className="absolute top-3 right-3 bg-black bg-opacity-50 text-white rounded-full p-1.5 hover:bg-opacity-75 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-50 focus:ring-blue-500 disabled:opacity-50"
-                    aria-label="Remove image"
-                >
-                    <CloseIcon className="h-4 w-4" />
-                </button>
-            </div>
-        ) : (
-            <div className="w-full min-h-[7rem] border-2 border-dashed border-slate-300 rounded-lg flex flex-col justify-center items-center text-slate-500 p-4">
-                <input
-                    type="file"
-                    id="image-upload"
-                    className="hidden"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    disabled={isLoading}
-                />
-                <label
-                    htmlFor="image-upload"
-                    className={`flex flex-col items-center justify-center p-6 rounded-lg text-center w-full h-full transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                >
-                    <UploadIcon className="h-10 w-10 text-slate-400" />
-                    <span className="mt-2 block text-sm font-medium">ডিভাইস থেকে ছবি আপলোড করুন</span>
-                </label>
-            </div>
+      <div className="min-h-[120px]">
+        {activeTab === InputTab.Text && (
+          <div className="relative w-full">
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={isListening ? "শুনছি..." : "আপনার গণিতের প্রশ্নটি এখানে লিখুন, যেমন: x^2 - 5x + 6 = 0"}
+              className="w-full p-3 pr-12 border border-slate-300 rounded-lg resize-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition h-32"
+              disabled={isLoading}
+            />
+            {isSpeechRecognitionSupported && (
+              <button
+                type="button"
+                onClick={handleToggleListening}
+                className={`absolute bottom-3 right-3 p-2 rounded-full transition-colors ${
+                    isListening
+                        ? 'bg-red-500 text-white animate-pulse'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+                aria-label={isListening ? "শোনা বন্ধ করুন" : "ভয়েস ইনপুট শুরু করুন"}
+                title={isListening ? "শোনা বন্ধ করুন" : "ভয়েস ইনপুট শুরু করুন"}
+              >
+                  <MicrophoneIcon className="w-5 h-5" />
+              </button>
+            )}
+          </div>
         )}
-        </>
-      )}
-
-      <div className="flex justify-end">
-        <button
-          onClick={handleSolve}
-          disabled={isLoading}
-          className="inline-flex items-center px-6 py-2 border border-transparent text-sm font-semibold rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:bg-slate-400 disabled:cursor-not-allowed transition-colors"
-        >
-          {isLoading ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
-              প্রসেসিং...
-            </>
-          ) : (
-            <>
-              সমাধান করুন
-              <SendIcon className="ml-2 -mr-1 h-5 w-5" />
-            </>
-          )}
-        </button>
+        {(activeTab === InputTab.File || activeTab === InputTab.Camera) && (
+          <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center">
+            {imagePreview ? (
+              <div className="relative inline-block">
+                <img src={imagePreview} alt="Preview" className="max-h-40 rounded-md" />
+                <button onClick={handleRemoveImage} className="absolute -top-2 -right-2 bg-slate-700 text-white rounded-full p-1 hover:bg-slate-900">
+                  <CloseIcon className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {activeTab === InputTab.File && (
+                    <>
+                        <p className="text-slate-500">আপনার প্রশ্নের একটি ছবি আপলোড করুন</p>
+                        <button onClick={() => fileInputRef.current?.click()} className="font-semibold text-blue-600 hover:underline">ফাইল বাছাই করুন</button>
+                        <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+                    </>
+                )}
+                {activeTab === InputTab.Camera && (
+                     <>
+                        <p className="text-slate-500">ক্যামেরা দিয়ে সরাসরি ছবি তুলুন</p>
+                        <button onClick={() => setIsCameraOpen(true)} className="font-semibold text-blue-600 hover:underline">ক্যামেরা খুলুন</button>
+                    </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      <button
+        onClick={onSolve}
+        disabled={isLoading}
+        className="w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-teal-700 disabled:bg-slate-400 disabled:cursor-wait transition-colors flex items-center justify-center"
+      >
+        {isLoading && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>}
+        {isLoading ? 'সমাধান করা হচ্ছে...' : 'সমাধান করুন'}
+      </button>
+
+      <div className="text-center space-y-3 pt-2">
+          <p className="text-sm text-slate-600">কিছু উদাহরণ চেষ্টা করুন:</p>
+          <div className="flex flex-wrap justify-center gap-2">
+              <ExampleButton onClick={() => handleExampleClick('x^2 - 5x + 6 = 0')}>দ্বিঘাত সমীকরণ</ExampleButton>
+              <ExampleButton onClick={() => handleExampleClick('2x + 5 = 15')}>সরল সমীকরণ</ExampleButton>
+              <ExampleButton onClick={() => handleExampleClick('sin(90) + cos(0) = ?')}>ত্রিকোণমিতি</ExampleButton>
+              <ExampleButton onClick={() => handleExampleClick('d/dx (x^3 + 2x)')}>ব্যবকলন</ExampleButton>
+          </div>
+      </div>
+      <CameraModal isOpen={isCameraOpen} onClose={() => setIsCameraOpen(false)} onCapture={handleCameraCapture} />
     </div>
   );
 };

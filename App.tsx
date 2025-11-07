@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
-import { solveMathProblem } from './services/geminiService';
-import { InputTab, OutputFormat, Solution } from './types';
+import { solveMathProblem, fileToBase64, generateGraphFromText, GRAPH_KEYWORD } from './services/geminiService';
+import { Solution, OutputFormat } from './types';
 import Header from './components/Header';
 import InputArea from './components/InputArea';
 import OutputArea from './components/OutputArea';
@@ -8,76 +8,100 @@ import Footer from './components/Footer';
 import AboutModal from './components/AboutModal';
 
 const App: React.FC = () => {
-  const [activeInputTab, setActiveInputTab] = useState<InputTab>(InputTab.Text);
-  const [activeOutputFormat, setActiveOutputFormat] = useState<OutputFormat>(OutputFormat.Detailed);
-  const [problemInput, setProblemInput] = useState<string>('');
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [solution, setSolution] = useState<Solution>('');
+  const [inputText, setInputText] = useState<string>('');
+  const [inputImage, setInputImage] = useState<File | null>(null);
+  const [solution, setSolution] = useState<Solution>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string>('');
+  const [outputFormat, setOutputFormat] = useState<OutputFormat>(OutputFormat.Detailed);
+  const [error, setError] = useState<string | null>(null);
   const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
 
   const handleSolve = useCallback(async () => {
-    if (activeInputTab === InputTab.Text && !problemInput.trim()) {
-      setError('অনুগ্রহ করে একটি সমস্যা লিখুন।');
-      return;
-    }
-    if (activeInputTab === InputTab.Image && !imageFile) {
-      setError('অনুগ্রহ করে একটি ছবি আপলোড করুন।');
+    if (!inputText.trim() && !inputImage) {
+      setError('অনুগ্রহ করে একটি প্রশ্ন লিখুন অথবা ছবি আপলোড করুন।');
       return;
     }
 
     setIsLoading(true);
-    setSolution('');
-    setError('');
+    setError(null);
+    setSolution(null);
+
+    const promptParts: (string | { inlineData: { mimeType: string; data: string } })[] = [];
+    let problemDescription = inputText;
+
+    // Order matters: text first, then image.
+    if (inputText) {
+      promptParts.push(inputText);
+    }
+    if (inputImage) {
+      try {
+        const { mimeType, data } = await fileToBase64(inputImage);
+        promptParts.push({ inlineData: { mimeType, data } });
+        if (!problemDescription) {
+            problemDescription = "the problem in the image";
+        }
+      } catch (e) {
+        setError('ছবি প্রসেস করা সম্ভব হয়নি।');
+        setIsLoading(false);
+        return;
+      }
+    }
 
     try {
-      const result = await solveMathProblem({
-        text: problemInput,
-        image: imageFile,
-        inputMethod: activeInputTab,
-        outputFormat: activeOutputFormat,
-      });
-      setSolution(result);
+      const resultText = await solveMathProblem(promptParts, outputFormat);
 
+      if (resultText.trim().endsWith(GRAPH_KEYWORD)) {
+        const cleanedText = resultText.replace(GRAPH_KEYWORD, '').trim();
+        // Show text solution first
+        setSolution(cleanedText);
+        // Then generate and add graph
+        try {
+            const graphImage = await generateGraphFromText(problemDescription);
+            setSolution({
+                isGraph: true,
+                explanation: cleanedText,
+                graphImage: graphImage,
+            });
+        } catch (graphError) {
+            console.error("Graph generation failed:", graphError);
+            // If graph fails, keep the text solution but add a warning
+            setSolution(cleanedText + "\n\n*(দুঃখিত, গ্রাফ তৈরি করা সম্ভব হয়নি।)*");
+        }
+      } else {
+        setSolution(resultText);
+      }
     } catch (err) {
       console.error(err);
       setError('সমাধান তৈরি করতে একটি ত্রুটি ঘটেছে। অনুগ্রহ করে আবার চেষ্টা করুন।');
     } finally {
       setIsLoading(false);
     }
-  }, [problemInput, imageFile, activeInputTab, activeOutputFormat]);
-
-  const onSampleProblemClick = (problem: string) => {
-    setProblemInput(problem);
-    setActiveInputTab(InputTab.Text);
-    setImageFile(null);
-  };
+  }, [inputText, inputImage, outputFormat]);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
+    <div className="min-h-screen w-screen bg-slate-100 text-slate-800 font-sans flex flex-col p-4">
       <Header />
-      <main className="container mx-auto max-w-4xl p-4">
-        <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 space-y-6">
-          <InputArea
-            activeInputTab={activeInputTab}
-            setActiveInputTab={setActiveInputTab}
-            problemInput={problemInput}
-            setProblemInput={setProblemInput}
-            imageFile={imageFile}
-            setImageFile={setImageFile}
-            handleSolve={handleSolve}
-            isLoading={isLoading}
-          />
-          <OutputArea
-            activeOutputFormat={activeOutputFormat}
-            setActiveOutputFormat={setActiveOutputFormat}
-            onSampleProblemClick={onSampleProblemClick}
-            solution={solution}
-            isLoading={isLoading}
-            error={error}
-          />
+      <main className="flex-grow container mx-auto max-w-3xl flex flex-col">
+        <div className="bg-blue-50/50 rounded-xl shadow-lg border border-slate-200/80 p-1.5 mt-4">
+            <div className="bg-white rounded-lg p-4 sm:p-6">
+                <InputArea
+                  inputText={inputText}
+                  setInputText={setInputText}
+                  setInputImage={setInputImage}
+                  onSolve={handleSolve}
+                  isLoading={isLoading}
+                />
+            </div>
         </div>
+        
+        {error && <div className="mt-6 text-center text-red-600 bg-red-100 p-3 rounded-lg">{error}</div>}
+
+        <OutputArea
+          solution={solution}
+          isLoading={isLoading}
+          outputFormat={outputFormat}
+          setOutputFormat={setOutputFormat}
+        />
       </main>
       <Footer onBrandClick={() => setIsAboutModalOpen(true)} />
       {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}
