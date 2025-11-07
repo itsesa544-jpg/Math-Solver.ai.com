@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { HistoryItem } from '../types';
 import { CloseIcon } from './Icons';
@@ -34,27 +35,33 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({ isOpen, onClose, histor
                 <p className="text-sm">Solve a problem to see it here.</p>
               </div>
             ) : (
-              history.map(item => (
-                <button 
-                  key={item.id} 
-                  onClick={() => onItemClick(item)}
-                  className="w-full text-left p-3 rounded-lg bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150"
-                >
-                  <div className="flex items-start gap-3">
-                    {item.imagePreview ? (
-                      <img src={item.imagePreview} alt="Problem preview" className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-slate-200" />
-                    ) : (
-                       <div className="w-12 h-12 flex-shrink-0 bg-blue-100 text-blue-600 rounded-md flex items-center justify-center font-mono text-xl">
-                         T
-                       </div>
-                    )}
-                    <div className="flex-grow overflow-hidden">
-                      <p className="text-sm font-medium text-slate-800 truncate">{item.problemInput}</p>
-                      <p className="text-xs text-slate-500 mt-1 truncate">{item.solution}</p>
+              history.map(item => {
+                const solutionText = typeof item.solution === 'string'
+                  ? item.solution
+                  : item.solution.explanation;
+
+                return (
+                  <button 
+                    key={item.id} 
+                    onClick={() => onItemClick(item)}
+                    className="w-full text-left p-3 rounded-lg bg-slate-50 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-150"
+                  >
+                    <div className="flex items-start gap-3">
+                      {item.imagePreview ? (
+                        <img src={item.imagePreview} alt="Problem preview" className="w-12 h-12 object-cover rounded-md flex-shrink-0 bg-slate-200" />
+                      ) : (
+                         <div className="w-12 h-12 flex-shrink-0 bg-blue-100 text-blue-600 rounded-md flex items-center justify-center font-mono text-xl">
+                           T
+                         </div>
+                      )}
+                      <div className="flex-grow overflow-hidden">
+                        <p className="text-sm font-medium text-slate-800 truncate">{item.problemInput}</p>
+                        <p className="text-xs text-slate-500 mt-1 truncate">{solutionText}</p>
+                      </div>
                     </div>
-                  </div>
-                </button>
-              ))
+                  </button>
+                )
+              })
             )}
           </div>
           

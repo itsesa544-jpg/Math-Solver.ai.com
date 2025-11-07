@@ -10,10 +10,18 @@ export enum OutputFormat {
   Direct = 'direct',
 }
 
+export interface GraphSolution {
+  isGraph: true;
+  explanation: string;
+  graphImage: string; // base64 data URL
+}
+
+export type Solution = string | GraphSolution;
+
 export interface HistoryItem {
   id: number;
   inputTab: InputTab;
   problemInput: string;
   imagePreview: string | null;
-  solution: string;
+  solution: Solution;
 }

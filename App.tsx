@@ -1,12 +1,14 @@
+
 import React, { useState, useCallback } from 'react';
 import { solveMathProblem } from './services/geminiService';
-import { InputTab, OutputFormat, HistoryItem } from './types';
+import { InputTab, OutputFormat, HistoryItem, Solution } from './types';
 import Header from './components/Header';
 import InputArea from './components/InputArea';
 import OutputArea from './components/OutputArea';
 import Footer from './components/Footer';
 import AboutModal from './components/AboutModal';
 import HistorySidebar from './components/HistorySidebar';
+import HistoryDetail from './components/HistoryDetail';
 
 const fileToDataUrl = (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -22,12 +24,13 @@ const App: React.FC = () => {
   const [activeOutputFormat, setActiveOutputFormat] = useState<OutputFormat>(OutputFormat.Detailed);
   const [problemInput, setProblemInput] = useState<string>('');
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [solution, setSolution] = useState<string>('');
+  const [solution, setSolution] = useState<Solution>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [isAboutModalOpen, setIsAboutModalOpen] = useState<boolean>(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState<boolean>(false);
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [selectedHistoryItem, setSelectedHistoryItem] = useState<HistoryItem | null>(null);
 
   const handleSolve = useCallback(async () => {
     if (activeInputTab === InputTab.Text && !problemInput.trim()) {
@@ -78,20 +81,22 @@ const App: React.FC = () => {
     setProblemInput(problem);
     setActiveInputTab(InputTab.Text);
     setImageFile(null);
+    setSelectedHistoryItem(null);
   };
 
   const handleHistoryItemClick = (item: HistoryItem) => {
-    setActiveInputTab(item.inputTab);
-    setProblemInput(item.problemInput);
-    setImageFile(null); // Cannot restore file object, but we show preview
-    setSolution(item.solution);
-    setError('');
+    setSelectedHistoryItem(item);
     setIsHistoryOpen(false);
+  }
+
+  const handleBackToMain = () => {
+    setSelectedHistoryItem(null);
   }
 
   const handleClearHistory = () => {
     if (window.confirm('আপনি কি নিশ্চিত যে আপনি সমস্ত ইতিহাস মুছে ফেলতে চান? এই কাজটি আর ফেরানো যাবে না।')) {
       setHistory([]);
+      setSelectedHistoryItem(null);
     }
   };
 
@@ -99,26 +104,33 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans">
       <Header onHistoryClick={() => setIsHistoryOpen(true)} />
       <main className="container mx-auto max-w-4xl p-4">
-        <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 space-y-6">
-          <InputArea
-            activeInputTab={activeInputTab}
-            setActiveInputTab={setActiveInputTab}
-            problemInput={problemInput}
-            setProblemInput={setProblemInput}
-            imageFile={imageFile}
-            setImageFile={setImageFile}
-            handleSolve={handleSolve}
-            isLoading={isLoading}
+        {selectedHistoryItem ? (
+          <HistoryDetail 
+            item={selectedHistoryItem}
+            onBack={handleBackToMain}
           />
-          <OutputArea
-            activeOutputFormat={activeOutputFormat}
-            setActiveOutputFormat={setActiveOutputFormat}
-            onSampleProblemClick={onSampleProblemClick}
-            solution={solution}
-            isLoading={isLoading}
-            error={error}
-          />
-        </div>
+        ) : (
+          <div className="bg-white rounded-xl shadow-md p-4 sm:p-6 space-y-6">
+            <InputArea
+              activeInputTab={activeInputTab}
+              setActiveInputTab={setActiveInputTab}
+              problemInput={problemInput}
+              setProblemInput={setProblemInput}
+              imageFile={imageFile}
+              setImageFile={setImageFile}
+              handleSolve={handleSolve}
+              isLoading={isLoading}
+            />
+            <OutputArea
+              activeOutputFormat={activeOutputFormat}
+              setActiveOutputFormat={setActiveOutputFormat}
+              onSampleProblemClick={onSampleProblemClick}
+              solution={solution}
+              isLoading={isLoading}
+              error={error}
+            />
+          </div>
+        )}
       </main>
       <Footer onBrandClick={() => setIsAboutModalOpen(true)} />
       {isAboutModalOpen && <AboutModal onClose={() => setIsAboutModalOpen(false)} />}
