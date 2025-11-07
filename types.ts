@@ -18,9 +18,9 @@ export interface GraphSolution {
 
 export type Solution = string | GraphSolution;
 
+// Fix: Add missing HistoryItem type
 export interface HistoryItem {
-  id: number;
-  inputTab: InputTab;
+  id: string;
   problemInput: string;
   imagePreview: string | null;
   solution: Solution;

@@ -1,8 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { InputTab } from '../types';
-import { SendIcon, UploadIcon, CloseIcon, CameraIcon } from './Icons';
-import CameraModal from './CameraModal';
+import { SendIcon, UploadIcon, CloseIcon } from './Icons';
 
 interface InputAreaProps {
   activeInputTab: InputTab;
@@ -26,7 +25,6 @@ const InputArea: React.FC<InputAreaProps> = ({
   isLoading,
 }) => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [isCameraOpen, setIsCameraOpen] = useState<boolean>(false);
 
   useEffect(() => {
     if (!imageFile) {
@@ -46,10 +44,6 @@ const InputArea: React.FC<InputAreaProps> = ({
     if (e.target.files && e.target.files[0]) {
       setImageFile(e.target.files[0]);
     }
-  };
-  
-  const handleCapture = (file: File) => {
-    setImageFile(file);
   };
 
   return (
@@ -102,7 +96,7 @@ const InputArea: React.FC<InputAreaProps> = ({
                 </button>
             </div>
         ) : (
-            <div className="w-full min-h-[7rem] border-2 border-dashed border-slate-300 rounded-lg flex flex-col sm:flex-row justify-center items-center text-slate-500 gap-4 p-4">
+            <div className="w-full min-h-[7rem] border-2 border-dashed border-slate-300 rounded-lg flex flex-col justify-center items-center text-slate-500 p-4">
                 <input
                     type="file"
                     id="image-upload"
@@ -113,24 +107,11 @@ const InputArea: React.FC<InputAreaProps> = ({
                 />
                 <label
                     htmlFor="image-upload"
-                    className={`flex flex-col items-center justify-center p-3 rounded-lg text-center w-full sm:w-auto h-full sm:h-auto transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
+                    className={`flex flex-col items-center justify-center p-6 rounded-lg text-center w-full h-full transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
                 >
-                    <UploadIcon className="h-8 w-8 text-slate-400" />
-                    <span className="mt-1 block text-sm font-medium">ডিভাইস থেকে আপলোড</span>
+                    <UploadIcon className="h-10 w-10 text-slate-400" />
+                    <span className="mt-2 block text-sm font-medium">ডিভাইস থেকে ছবি আপলোড করুন</span>
                 </label>
-
-                <div className="h-full sm:h-16 w-px bg-slate-200 hidden sm:block"></div>
-                <div className="w-full sm:w-px h-px bg-slate-200 block sm:hidden"></div>
-
-                <button
-                    onClick={() => setIsCameraOpen(true)}
-                    disabled={isLoading}
-                    className={`flex flex-col items-center justify-center p-3 rounded-lg text-center w-full sm:w-auto h-full sm:h-auto transition-colors ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100'}`}
-                    aria-label="Take a photo"
-                >
-                    <CameraIcon className="h-8 w-8 text-slate-400" />
-                    <span className="mt-1 block text-sm font-medium">ছবি তুলুন</span>
-                </button>
             </div>
         )}
         </>
@@ -158,11 +139,6 @@ const InputArea: React.FC<InputAreaProps> = ({
           )}
         </button>
       </div>
-      <CameraModal 
-        isOpen={isCameraOpen}
-        onClose={() => setIsCameraOpen(false)}
-        onCapture={handleCapture}
-      />
     </div>
   );
 };
